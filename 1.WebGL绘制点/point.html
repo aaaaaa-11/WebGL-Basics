@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>绘制点坐标</title>
+  <script src="./glMatrix-0.9.6.min.js"></script>
+  <script>
+    var webgl
+    var projMat4 = mat4.create() // 初始化一个4 * 4的矩阵
+    // 声明一个顶点着色器
+    var vertexString = `
+      attribute vec4 a_position;
+      uniform mat4 proj;
+      void main(){
+        gl_Position = proj * a_position;
+        gl_PointSize = 60.0;
+      }
+    ` // 供GPU调用的一些代码
+    /*
+      attribute vec4 a_position; // 定义一个变量，接收要绘制的点，vec4:四维向量，xyzw四个分量，分量是浮点数
+      uniform mat4 proj(); // projMat4求出后，来接收这个投影坐标系，mat4: 4 * 4矩阵
+      void main(){ // shader的入口函数
+        gl_Position = proj * a_position; // gl_Position内置变量，这里将变量a_position里的点信息赋值给它，但是要先根据投影做一定的变换
+      }
+     */
+
+     var fragmentString = `
+      void main(){
+        gl_FragColor = vec4(0,0,1.0,1.0);
+      }
+     ` // 片元着色器
+     /*
+      gl_FragColor = vec4(0, 0, 1.0, 1.0) // 将颜色vec4(0, 0, 1.0, 1.0)赋值给内置变量gl_FragColor
+      */
+
+    // 入口函数
+    function init () {
+      initWebgl()
+      initShader()
+      iniBuffer()
+      draw()
+    }
+
+    // webgl初始化函数
+    function initWebgl() {
+      let webglDiv = document.getElementById('webglCanvas')
+      webgl = webglDiv.getContext('webgl')
+      // webgl可视区范围，(原点，x轴长度，y轴长度) https://developer.mozilla.org/zh-CN/docs/Web/API/WebGLRenderingContext/viewport
+      webgl.viewport(0, 0, webglDiv.clientWidth, webglDiv.clientHeight)
+      // 定义阴影范围，(x轴向量，y轴向量，z轴向量，投影矩阵)
+      mat4.ortho(0, webglDiv.clientWidth, webglDiv.clientHeight, 0, -1, 1, projMat4)
+    }
+
+    // shader初始化函数
+    function initShader () {
+      // createShader()创建webgl着色器对象
+      let vsshader = webgl.createShader(webgl.VERTEX_SHADER) // 创建顶点着色器
+      let fsshader = webgl.createShader(webgl.FRAGMENT_SHADER) // 创建片元着色器
+
+      // 将GLSL程序中的着色器(上面的shader文本)和创建的webgl着色器对象分别绑定
+      webgl.shaderSource(vsshader, vertexString)
+      webgl.shaderSource(fsshader, fragmentString)
+
+      // 编译WebGLShader着色器，使其成为二进制数据，然后可以被WebGLProgram对象使用
+      webgl.compileShader(vsshader)
+      webgl.compileShader(fsshader)
+
+      // 创建一个WebGLProgram对象
+      let program = webgl.createProgram()
+
+      // 将WebGLProgram和上面两个着色器绑定，attachShader()负责往WebGLProgram添加一个片元/顶点着色器
+      webgl.attachShader(program, vsshader)
+      webgl.attachShader(program, fsshader)
+
+      // 链接给定的WebGLProgram，从而完成为程序的片元和顶点着色器准备GPU代码的过程，参数为一个用于链接的WebGLProgram对象
+      webgl.linkProgram(program)
+
+      // 将定义好的WebGLProgram对象添加到当前的渲染状态中
+      webgl.useProgram(program)
+
+      webgl.program = program // 为了方便以后使用，将项目挂到webgl对象上
+    }
+
+    // 数据缓冲区初始化函数
+    function iniBuffer () {
+      // Float32Array 类型数组代表的是平JS内置的标准对象，为 32 位的浮点数型数组，其内容初始化为0
+      // 一旦建立起来，你可以使用这个对象的方法对其元素进行操作，或者使用标准数组索引语法 (使用方括号)
+      // https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Float32Array
+      let pointPosition = new Float32Array([100.0, 100.0, 0.0, 1.0]) // [x, y, z, ?]
+
+      // 获取shader里的a_Position变量，getAttribLocation()返回给定的WebGLProgram对象中某属性的下标指向位置
+      // 第一个参数为WebGLProgram，第二个参数为需要获取下标指向位置的GLSL变量名
+      let aPosition = webgl.getAttribLocation(webgl.program, "a_position")
+      // 将准备的数据放到aPosition变量中 vertex顶点，Attrib属性，4参数个数，fv上面的Flot32Array
+      webgl.vertexAttrib4fv(aPosition, pointPosition)
+
+      // 获取WebGLProgram对象中uniform变量的位置
+      let uniforproj = webgl.getUniformLocation(webgl.program, "proj")
+      // 用于设置一个4 * 4的矩阵类型的uniform变量值，接收4个参数：
+      // 1.要设置值的unifrom变量的地址
+      // 2.是否将矩阵转置，默认为false
+      // 3.要设置的值，应该是一个4 * 4的矩阵
+      // 4.矩阵在数据中的偏移量，默认为0
+      webgl.uniformMatrix4fv(uniforproj, false, projMat4)
+    }
+
+    // webgl绘制函数
+    function draw() {
+      // 清空颜色缓冲区时使用的颜色值，(r,g,b,a)取值均在0～1范围内
+      webgl.clearColor(0.0, 0.0, 0.0, 1.0)
+
+      // 使用预设值来清空缓冲，预设值可以使用 clearColor() 、 clearDepth() 或 clearStencil()
+      // 设置裁剪、抖动处理和缓冲写入遮罩会影响 clear() 方法
+      // 参数为一个用于指定需要清除的缓冲区的 GLbitfield (en-US) ，可能的值有：gl.COLOR_BUFFER_BIT(颜色缓冲区)，gl.DEPTH_BUFFER_BIT (深度缓冲区)， gl.STENCIL_BUFFER_BIT(模板缓冲区)
+      // 没有返回值
+      webgl.clear(webgl.COLOR_BUFFER_BIT)
+
+      // drawArrays() 方法用于从向量数组中绘制图元。接收3个参数
+      // 第一个参数为指定绘制图元的方式，可能值如下：
+      // gl.POINTS: 绘制一系列点。
+      // gl.LINE_STRIP: 绘制一个线条。即，绘制一系列线段，上一点连接下一点。
+      // gl.LINE_LOOP: 绘制一个线圈。即，绘制一系列线段，上一点连接下一点，并且最后一点与第一个点相连。
+      // gl.LINES: 绘制一系列单独线段。每两个点作为端点，线段之间不连接。
+      // gl.TRIANGLE_STRIP：绘制一个三角带。
+      // gl.TRIANGLE_FAN：绘制一个三角扇。
+      // gl.TRIANGLES: 绘制一系列三角形。每三个点作为顶点。
+      // 第二个参数为指定从哪个点开始绘制。
+      // 第三个参数为指定绘制需要使用到多少个点。
+      webgl.drawArrays(webgl.POINTS, 0, 1)
+    }
+  </script>
+</head>
+<body onload="init()">
+  <canvas id="webglCanvas" width="500" height="500"></canvas>
+</body>
+</html>
