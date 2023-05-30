@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="./glMatrix-0.9.6.min.js"></script>
+  <script>
+    let webgl;
+    const projMat4 = mat4.create()
+
+    // 顶点着色器
+    const vertexString = `
+    attribute vec4 a_position;
+    uniform mat4 proj;
+    void main(void) {
+      gl_Position = a_position;
+      gl_PointSize = 60.0;
+    }
+    `
+
+    // 片元着色器
+    const fragmentString = `
+      void main(void) {
+        gl_FragColor = vec4(1.0, 0, 1.0, 1.0);
+      }
+    `
+
+    function init() {
+      initWebgl()
+      initShader()
+      initBuffer()
+      draw()
+    }
+
+    function initWebgl () {
+      // 获取canvas的上下文赋值给webgl对象
+      let webglDiv = document.getElementById('myCanvas')
+      webgl = webglDiv.getContext('webgl')
+
+      // 设置webgl对象可视区和阴影面积
+      webgl.viewport(0, 0, webglDiv.clientWidth, webglDiv.clientHeight)
+      mat4.ortho(0, webglDiv.clientWidth, webglDiv.clientHeight, 0, -1, 1, projMat4)
+    }
+
+    function initShader () {
+      // 创建顶点着色器和片元着色器对象
+      let vsshader = webgl.createShader(webgl.VERTEX_SHADER)
+      let fsshader = webgl.createShader(webgl.FRAGMENT_SHADER)
+
+      webgl.shaderSource(vsshader, vertexString)
+      webgl.shaderSource(fsshader, fragmentString)
+
+      // 编译
+      webgl.compileShader(vsshader)
+      webgl.compileShader(fsshader)
+
+      // 创建WebGL Program对象
+      const program = webgl.createProgram()
+
+      // 将program对象和两个着色器对象绑定
+      webgl.attachShader(program, vsshader)
+      webgl.attachShader(program, fsshader)
+
+      // 链接对象到webgl
+      webgl.linkProgram(program)
+
+      // 将program添加到当前渲染状态中
+      webgl.useProgram(program)
+
+      webgl.program = program
+    }
+
+    function getPoints () {
+      let webglDiv = document.getElementById('myCanvas')
+      const halfWidth = webglDiv.clientWidth / 2
+      const halfHeight = webglDiv.clientHeight / 2
+      // 创建点
+      let arr = [
+        0, 1, 0,
+        0.25, 0.3, 0,
+        1, 0.3, 0,
+        0.35, -0.1, 0,
+        0.6, -0.8, 0,
+        0, -0.25, 0,
+        -0.6, -0.8, 0,
+        -0.35, -0.1, 0,
+        -1, 0.3, 0,
+        -0.25, 0.3, 0,
+      ]
+      // let arr = [
+      //   // 使用LINE_LOOP绘制五角星（不规则）
+      //   // 点位需要坐标系转换
+      //   halfWidth, 0, 0,
+      //   halfWidth + 75, halfHeight - 100, 0,
+      //   webglDiv.clientWidth - 25, halfHeight - 100, 0,
+      //   halfWidth + 125, halfHeight + 25, 0,
+      //   halfWidth + 230, webglDiv.clientHeight - 75, 0,
+      //   halfWidth, halfHeight + 90, 0,
+      //   halfWidth - 230, webglDiv.clientHeight - 75, 0,
+      //   halfWidth - 125, halfHeight + 25, 0,
+      //   25, halfHeight - 100, 0,
+      //   halfWidth - 75, halfHeight - 100, 0,
+      // ].map((i, index) => {
+      //   if (index % 3 === 0) {
+      //     return (i - halfWidth) / halfWidth
+      //   } else if (index % 3 === 1) {
+      //     return -(i - halfHeight) / halfHeight
+      //   }
+      //   return i
+      // })
+      return arr
+    }
+
+    function initBuffer () {
+      let arr = getPoints()
+      console.log('arr', arr);
+      let pointPosition = new Float32Array(arr)
+
+      // 获取顶点着色器中的点变量
+      let aPosition = webgl.getAttribLocation(webgl.program, 'a_position')
+      // 创建缓冲区
+      let lineBuffer = webgl.createBuffer()
+      webgl.bindBuffer(webgl.ARRAY_BUFFER, lineBuffer)
+      webgl.bufferData(webgl.ARRAY_BUFFER, pointPosition, webgl.STATIC_DRAW)
+      webgl.enableVertexAttribArray(aPosition)
+      webgl.vertexAttribPointer(aPosition, 3, webgl.FLOAT, false, 3 * 4, 0 * 4)
+
+      let uniformproj = webgl.getUniformLocation(webgl.program, 'proj')
+      webgl.uniformMatrix4fv(uniformproj, false, projMat4)
+    }
+
+    function draw () {
+      let arr = getPoints()
+      webgl.clearColor(0.0, 0.0, 0.0, 1.0)
+      webgl.clear(webgl.COLOR_BUFFER_BIT | webgl.DEPTH_BUFFER_BIT)
+      webgl.drawArrays(webgl.LINE_LOOP, 0, arr.length / 3)
+    }
+  </script>
+</head>
+<body onload="init()">
+  <canvas id="myCanvas" width="700" height="700"></canvas>
+</body>
+</html>
