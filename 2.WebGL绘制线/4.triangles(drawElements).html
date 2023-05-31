@@ -55,6 +55,16 @@
       // 编译
       webgl.compileShader(vsshader)
       webgl.compileShader(fsshader)
+      if (!webgl.getShaderParameter(vsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(vsshader)
+        alert(err)
+        return
+      }
+      if (!webgl.getShaderParameter(fsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(fsshader)
+        alert(err)
+        return
+      }
 
       // 创建WebGL Program对象
       const program = webgl.createProgram()
@@ -65,6 +75,12 @@
 
       // 链接对象到webgl
       webgl.linkProgram(program)
+      // 检查linkProgram是否连接成功
+      if (!webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
+        const err = webgl.getProgramInfoLog(program)
+        alert(err)
+        return
+      }
 
       // 将program添加到当前渲染状态中
       webgl.useProgram(program)
