@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>简易版贪吃蛇</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      width: 100%;
+      height: 100%;
+      text-align: center;
+      padding-top: 10vh;
+    }
+  </style>
+  <script src="./glMatrix-0.9.6.min.js"></script>
+  <script>
+    const CANVASWIDTH = 700
+    const CANVASHEIGHT = 500
+
+    let webgl
+    const vertexString = `
+    attribute vec3 a_position;
+    void main() {
+      gl_Position = vec4(a_position, 1.0);
+      // gl_Position = vec4(a_position, 1.0);
+    }
+    `
+
+    const fragmentString = `
+    void main() {
+      gl_FragColor = vec4(0.9, 0.6, 0.1, 1.0);
+    }
+    `
+    function init() {
+      initWebgl()
+      initShader()
+      initBuffer()
+      draw()
+      keyDown()
+    }
+
+    function initWebgl() {
+      const webglDiv = document.getElementById('myCanvas')
+      webgl = webglDiv.getContext('webgl')
+      webgl.viewport(0, 0, webglDiv.clientWidth, webglDiv.clientHeight)
+    }
+
+    function initShader() {
+      const shaderVS = webgl.createShader(webgl.VERTEX_SHADER)
+      const shaderFS = webgl.createShader(webgl.FRAGMENT_SHADER)
+
+      webgl.shaderSource(shaderVS, vertexString)
+      webgl.shaderSource(shaderFS, fragmentString)
+
+      webgl.compileShader(shaderVS)
+      webgl.compileShader(shaderFS)
+
+      if (!webgl.getShaderParameter(shaderVS, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(shaderVS)
+        alert(err)
+      }
+      if (!webgl.getShaderParameter(shaderFS, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(shaderFS)
+        alert(err)
+      }
+
+      const program = webgl.createProgram()
+
+      webgl.attachShader(program, shaderVS)
+      webgl.attachShader(program, shaderFS)
+
+      webgl.linkProgram(program)
+      if (!webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
+        const err = webgl.getProgramInfoLog(program)
+        alert(err)
+      }
+
+      webgl.useProgram(program)
+
+      webgl.program = program
+    }
+
+    let arr = [
+      0.0, 0.2, 0,
+      -0.1, 0.0, 0,
+      0.1, 0.0, 0,
+    ]
+    function initBuffer() {
+      const float = new Float32Array(arr)
+
+      const buffer = webgl.createBuffer()
+      webgl.bindBuffer(webgl.ARRAY_BUFFER, buffer)
+      webgl.bufferData(webgl.ARRAY_BUFFER, float, webgl.STATIC_DRAW)
+
+      const aPosition = webgl.getAttribLocation(webgl.program, 'a_position')
+      webgl.vertexAttribPointer(aPosition, 3, webgl.FLOAT, false, 0, 0)
+      webgl.enableVertexAttribArray(aPosition)
+    }
+
+    function keyDown () {
+      document.onkeydown = function (event) {
+        let countx = 0
+        let county = 0
+        if (event.keyCode === 37) { // 左
+          countx = -0.02
+        } else if (event.keyCode === 38) { // 上
+          county = 0.02
+        } else if (event.keyCode === 39) { // 右
+          countx = 0.02
+        } else if (event.keyCode === 40) { // 下
+          county = -0.02
+        } else {
+          return
+        }
+        arr = arr.map((i, index) => {
+          if (index % 3 === 0) {
+            return Number(i + countx)
+          } else if (index % 3 === 1) {
+            return Number(i + county)
+          } else {
+            return i
+          }
+        })
+        initBuffer()
+
+        draw()
+        requestAnimationFrame(keyDown)
+      }
+    }
+
+    function draw () {
+      webgl.clearColor(0.5, 0.5, 0.5, 1.0)
+      webgl.clear(webgl.COLOR_BUFFER_BIT)
+      webgl.drawArrays(webgl.TRIANGLES, 0, arr.length / 3)
+    }
+  </script>
+</head>
+<body onload="init()">
+  <p>按 上下左右 键 移动三角形。</p>
+  <canvas id="myCanvas" width="700" height="500"></canvas>
+</body>
+</html>

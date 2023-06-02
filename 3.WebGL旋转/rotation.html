@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="./glMatrix-0.9.6.min.js"></script>
+  <script>
+    let webgl
+    const vertexString = `
+    attribute vec3 a_position;
+    uniform float angle;
+    void main() {
+      gl_Position = vec4(a_position.x * cos(angle) - a_position.y * sin(angle), a_position.x * sin(angle) + a_position.y * cos(angle), a_position.z, 1.0);
+    }
+    `
+    const fragmentString = `
+    void main() {
+      gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);
+    }
+    `
+
+    function init() {
+      initWebgl()
+      initShader()
+      initBuffer()
+      draw()
+    }
+
+    function initWebgl () {
+      const canvas = document.getElementById('myCanvas')
+      webgl = canvas.getContext('webgl')
+      webgl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight)
+    }
+    function initShader () {
+      const vsshader = webgl.createShader(webgl.VERTEX_SHADER)
+      const fsshader = webgl.createShader(webgl.FRAGMENT_SHADER)
+
+      webgl.shaderSource(vsshader, vertexString)
+      webgl.shaderSource(fsshader, fragmentString)
+
+      webgl.compileShader(vsshader)
+      webgl.compileShader(fsshader)
+
+      if (!webgl.getShaderParameter(vsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(vsshader)
+        alert(err)
+        return
+      }
+      if (!webgl.getShaderParameter(fsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(fsshader)
+        alert(err)
+        return
+      }
+
+      const program = webgl.createProgram()
+
+      webgl.attachShader(program, vsshader)
+      webgl.attachShader(program, fsshader)
+
+      webgl.linkProgram(program)
+
+      if (!webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
+        const err = webgl.getProgramInfoLog(program)
+        alert(err)
+        return
+      }
+
+      webgl.useProgram(program)
+
+      webgl.program = program
+    }
+
+    let arr = [
+      0.1, 0.4, 0,
+      0.1, 0.5, 0,
+      0.2, 0.4, 0
+    ]
+    function initBuffer () {
+      const float = new Float32Array(arr)
+
+      const buffer = webgl.createBuffer()
+      webgl.bindBuffer(webgl.ARRAY_BUFFER, buffer)
+      webgl.bufferData(webgl.ARRAY_BUFFER, float, webgl.STATIC_DRAW)
+
+
+      const aPosition = webgl.getAttribLocation(webgl.program, 'a_position')
+      webgl.vertexAttribPointer(aPosition, 3, webgl.FLOAT, false, 0, 0)
+      webgl.enableVertexAttribArray(aPosition)
+
+
+      // 获取着色器程序中弧度变量
+      const uAngle = webgl.getUniformLocation(webgl.program, 'angle')
+      // 定义一个旋转弧度
+      const angle1 = 90 * Math.PI / 180
+      // 将旋转弧度赋值给弧度变量
+      webgl.uniform1f(uAngle, angle1)
+    }
+
+    function draw () {
+      webgl.clearColor(1.0, 0.0, 0.0, 1.0)
+      webgl.clear(webgl.COLOR_BUFFER_BIT)
+      webgl.drawArrays(webgl.TRIANGLES, 0, arr.length / 3)
+    }
+  </script>
+</head>
+<body onload="init()">
+  <canvas id="myCanvas" width="500" height="500"></canvas>
+</body>
+</html>

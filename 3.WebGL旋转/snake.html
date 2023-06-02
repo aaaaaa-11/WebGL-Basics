@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>低配版贪吃蛇</title>
+  <script src="./glMatrix-0.9.6.min.js"></script>
+  <script>
+    let webgl
+    const vertexString = `
+    attribute vec3 a_position;
+    uniform float offsetx;
+    uniform float offsety;
+    void main() {
+      gl_Position = vec4(a_position.x + offsetx, a_position.y + offsety, a_position.z, 1.0);
+    }
+    `
+    const fragmentString = `
+    void main() {
+      gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);
+    }
+    `
+
+    function init() {
+      initWebgl()
+      initShader()
+      initBuffer()
+      draw()
+      initEvent()
+    }
+
+    function initWebgl () {
+      const canvas = document.getElementById('myCanvas')
+      webgl = canvas.getContext('webgl')
+      webgl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight)
+    }
+
+    function initShader () {
+      const vsshader = webgl.createShader(webgl.VERTEX_SHADER)
+      const fsshader = webgl.createShader(webgl.FRAGMENT_SHADER)
+
+      webgl.shaderSource(vsshader, vertexString)
+      webgl.shaderSource(fsshader, fragmentString)
+
+      webgl.compileShader(vsshader)
+      webgl.compileShader(fsshader)
+
+      if (!webgl.getShaderParameter(vsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(vsshader)
+        alert(err)
+        return
+      }
+      if (!webgl.getShaderParameter(fsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(fsshader)
+        alert(err)
+        return
+      }
+
+      const program = webgl.createProgram()
+
+      webgl.attachShader(program, vsshader)
+      webgl.attachShader(program, fsshader)
+
+      webgl.linkProgram(program)
+
+      if (!webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
+        const err = webgl.getProgramInfoLog(program)
+        alert(err)
+        return
+      }
+
+      webgl.useProgram(program)
+
+      webgl.program = program
+    }
+
+    let arr = [
+      0.1, 0.4, 0,
+      0.1, 0.5, 0,
+      0.2, 0.4, 0
+    ]
+    let countx = 0
+    let county = 0
+
+    function initEvent () {
+      document.onkeydown = event => {
+        if (String.fromCharCode(event.keyCode) === 'W') {
+          county += 0.01
+        } else if (String.fromCharCode(event.keyCode) === 'S') {
+          county -= 0.01
+        } else if (String.fromCharCode(event.keyCode) === 'D') {
+          countx += 0.01
+        } else if (String.fromCharCode(event.keyCode) === 'A') {
+          countx -= 0.01
+        }
+      }
+    }
+    function initBuffer () {
+
+      const float = new Float32Array(arr)
+
+      const buffer = webgl.createBuffer()
+      webgl.bindBuffer(webgl.ARRAY_BUFFER, buffer)
+      webgl.bufferData(webgl.ARRAY_BUFFER, float, webgl.STATIC_DRAW)
+
+
+      const aPosition = webgl.getAttribLocation(webgl.program, 'a_position')
+      webgl.vertexAttribPointer(aPosition, 3, webgl.FLOAT, false, 0, 0)
+      webgl.enableVertexAttribArray(aPosition)
+
+
+      // 获取着色器程序中x、y平移变量
+      const offsetx = webgl.getUniformLocation(webgl.program, 'offsetx');
+      const offsety = webgl.getUniformLocation(webgl.program, 'offsety');
+      // 赋值
+      webgl.uniform1f(offsetx, countx)
+      webgl.uniform1f(offsety, county)
+    }
+
+    function draw () {
+      webgl.clearColor(1.0, 0.0, 0.0, 1.0)
+      webgl.clear(webgl.COLOR_BUFFER_BIT)
+      webgl.drawArrays(webgl.TRIANGLES, 0, arr.length / 3)
+    }
+
+    function onload() {
+      init()
+      window.requestAnimationFrame(onload)
+    }
+
+  </script>
+</head>
+<body onload="onload()">
+  <p>按 W 向上，按 S 向下， 按 D 向右， 按 A 向左 移动。</p>
+  <canvas id="myCanvas" width="500" height="500"></canvas>
+</body>
+</html>
