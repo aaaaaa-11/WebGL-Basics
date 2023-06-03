@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    #successInfo {
+      position: absolute;
+      left: 0;
+      z-index: 1;
+      top: 5px;
+      opacity: 0;
+      background-image: linear-gradient(to right, rgb(131, 131, 196), blue);
+      color: white;
+      text-align: center;
+      border-top-right-radius: 20px;
+      border-bottom-right-radius: 20px;
+      height: 40px;
+      line-height: 40px;
+      width: 400px;
+      transition: opacity 0.5s ease;
+    }
+  </style>
+  <script src="./1.WebGL绘制点/glMatrix-0.9.6.min.js"></script>
+  <script>
+    const CANVASHEIGHT = 600
+    const CANVASWIDTH = 800
+    let aniStep
+    let webgl;
+
+    const vertexSource = `
+    attribute vec3 a_position;
+    uniform float offsetx;
+    uniform float offsety;
+    void main() {
+      gl_Position = vec4(a_position.x + offsetx, a_position.y + offsety, a_position.z, 1.0);
+    }
+    `
+
+    const fragmentSource = `
+    void main() {
+      gl_FragColor = vec4(0.22, 0.65, 0.73, 1.0);
+    }
+    `
+
+    let step = 0.01 // 每次向x、y轴移动偏移量
+    let size = 0.1 // 长方形边长
+    let score = 0 // 得分
+    let stepEl;
+    let sizeEl;
+    let scoreEl;
+
+    function init() {
+      stepEl = document.getElementById('step')
+      sizeEl = document.getElementById('size')
+      scoreEl = document.getElementById('score')
+      stepEl.value = step
+      sizeEl.value = size
+      score.innerText = score
+
+      initWebgl()
+      initShader()
+      // initBuffer()
+      // draw()
+      move()
+      listenClick()
+    }
+    function initWebgl() {
+      const el = document.getElementById('gameCanvas')
+      webgl = el.getContext('webgl')
+      webgl.viewport(0, 0, el.clientWidth, el.clientHeight)
+    }
+
+    function initShader() {
+      const shaderVS = webgl.createShader(webgl.VERTEX_SHADER)
+      const shaderFS = webgl.createShader(webgl.FRAGMENT_SHADER)
+
+      webgl.shaderSource(shaderVS, vertexSource)
+      webgl.shaderSource(shaderFS, fragmentSource)
+
+      webgl.compileShader(shaderVS)
+      webgl.compileShader(shaderFS)
+      if (!webgl.getShaderParameter(shaderVS, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(shaderVS)
+        alert(err)
+      }
+      if (!webgl.getShaderParameter(shaderFS, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(shaderFS)
+        alert(err)
+      }
+
+      const program = webgl.createProgram()
+
+      webgl.attachShader(program, shaderVS)
+      webgl.attachShader(program, shaderFS)
+
+      webgl.linkProgram(program)
+      if (!webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
+        const err = webgl.getProgramInfoLog(program)
+        alert(err)
+      }
+
+      webgl.useProgram(program)
+
+      webgl.program = program
+    }
+
+    let offsetAngle = 0
+    let offsetX = 0
+    let offsetY = 0
+    let rectangle = []
+    function initBuffer() {
+      rectangle = [
+        size, size, 0,
+        -size, size, 0,
+        -size, -size, 0,
+        size, -size, 0,
+      ]
+
+      const float = new Float32Array(rectangle)
+
+      const buffer = webgl.createBuffer()
+      webgl.bindBuffer(webgl.ARRAY_BUFFER, buffer)
+      webgl.bufferData(webgl.ARRAY_BUFFER, float, webgl.STATIC_DRAW)
+
+      const aPosition = webgl.getAttribLocation(webgl.program, 'a_position')
+      webgl.vertexAttribPointer(aPosition, 3, webgl.FLOAT, false, 0, 0)
+      webgl.enableVertexAttribArray(aPosition)
+
+      // x、y分别随机移动步长step（上下左右随机移动）
+      rectangle.map((i, index) => {
+        if (index %3 === 0) { // x
+          if (i + offsetX < -1) {
+            offsetX += step
+          } else if (i + offsetX > 1) {
+            offsetX -= step
+          } else {
+            offsetX += step * (Math.random() > 0.5 ? 1 : -1)
+          }
+        } else if (index %3 === 1) { // y
+          if (i + offsetY < -1) {
+            offsetY += step
+          } else if (i + offsetY > 1) {
+            offsetY -= step
+          } else {
+            offsetY += step * (Math.random() > 0.5 ? 1 : -1)
+          }
+        }
+      })
+
+      const uOffsetX = webgl.getUniformLocation(webgl.program, 'offsetx')
+      const uOffsetY = webgl.getUniformLocation(webgl.program, 'offsety')
+
+      webgl.uniform1f(uOffsetX, offsetX)
+      webgl.uniform1f(uOffsetY, offsetY)
+    }
+
+    function draw() {
+      webgl.clearColor(0.1, 0.2, 0.9, 0.3)
+      webgl.clear(webgl.COLOR_BUFFER_BIT)
+      webgl.drawArrays(webgl.LINE_LOOP, 0, rectangle.length / 3)
+    }
+
+    function move () {
+      initBuffer()
+      draw()
+      aniStep = requestAnimationFrame(move)
+    }
+
+    // 修改移动步长（x、y偏移量）
+    function changeStep () {
+      let inputStep = stepEl.value
+      if (inputStep >= 0.01 && inputStep <= 0.5) return
+      stepEl.value = 0.01
+    }
+    // 修改移动长方形长宽）
+    function changeSize () {
+      let inputSize = sizeEl.value
+      if (inputSize >= 0.01 && inputSize <= 0.5) return
+      sizeEl.value = 0.1
+    }
+
+    function reset() {
+      // 修改步长
+      cancelAnimationFrame(aniStep)
+      step = Number(stepEl.value)
+      size = Number(sizeEl.value)
+      // initBuffer()
+      // draw()
+      // move()
+    }
+
+    let successEl
+    let successTimer
+    function showSuccess() {
+      if (!successEl) {
+        successEl = document.getElementById("successInfo")
+      }
+      clearTimeout(successTimer)
+      successEl.style.opacity = '1'
+      successTimer = setTimeout(() => {
+        successEl.style.opacity = '0'
+      }, 1000)
+    }
+
+    function listenClick() {
+      document.addEventListener('mousedown', e => {
+        const x = event.clientX
+        const y = event.clientY
+
+        const rect = event.target.getBoundingClientRect()
+        const top = rect.top
+        const left = rect.left
+
+        const halfCanvasWidth = CANVASWIDTH / 2
+        const halfCanvasHeight = CANVASHEIGHT / 2
+        const x_ = (x - left - halfCanvasWidth) / halfCanvasWidth
+        const y_ = -(y - top - halfCanvasHeight)/ halfCanvasHeight
+
+        if (
+          rectangle[0] + offsetX >= x_
+          && rectangle[3] + offsetX <= x_
+          && rectangle[1] + offsetY >= y_
+          && rectangle[7] + offsetY <= y_
+        ) {
+          // 点在框内，得分++
+          score += step / size
+          scoreEl.innerText = score.toFixed(2)
+          showSuccess()
+        }
+      })
+    }
+  </script>
+</head>
+<body onload="init()">
+  <p>鼠标点击到了移动的框，则得分，分数为 移动步长 / 框大小</p>
+  <div id="successInfo">太棒了！</div>
+  <div class="toolbar">
+    <label for="step">移动步长(0.01 ~ 0.5)：
+      <input onchange="changeStep()" type="number" minlength="0.01" maxlength="0.5" step="0.01" id="step" />
+    </label>
+    <label for="size">框大小(0.01 ~ 0.1)：
+      <input onchange="changeSize()" type="number" minlength="0.01" maxlength="0.1" step="0.01" id="size" />
+    </label>
+    <button onclick="reset()">重置</button>
+  </div>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <p>得分：
+    <span id="score">0</span>分
+  </p>
+</body>
+</html>

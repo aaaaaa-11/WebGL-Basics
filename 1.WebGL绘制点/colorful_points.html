@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>动态绘制不同颜色的点</title>
+  <script src="./glMatrix-0.9.6.min.js"></script>
+  <script>
+    const CANVASHEIGHT = 500
+    const CANVASWIDTH = 500
+    var webgl
+    // 顶点着色器
+    var vertexString = `
+      attribute vec3 a_position;
+      attribute vec3 a_color;
+      varying vec3 inColor;
+      void main(){
+        gl_Position = vec4(a_position, 1.0);
+        gl_PointSize = 60.0;
+        inColor = a_color;
+      }
+    `
+
+    // 片元着色器
+    var fragmentString = `
+    precision mediump float;
+    varying vec3 inColor;
+    void main(){
+      gl_FragColor = vec4(inColor, 1.0);
+    }
+    `
+    // 入口函数
+    function init () {
+      initWebgl()
+      initShader()
+      iniBuffer()
+      draw()
+    }
+
+    // webgl初始化函数
+    function initWebgl() {
+      let webglDiv = document.getElementById('webglCanvas')
+      webgl = webglDiv.getContext('webgl')
+      webgl.viewport(0, 0, webglDiv.clientWidth, webglDiv.clientHeight)
+    }
+
+    // 初始化shader
+    function initShader () {
+      let vsshader = webgl.createShader(webgl.VERTEX_SHADER)
+      let fsshader = webgl.createShader(webgl.FRAGMENT_SHADER)
+
+      webgl.shaderSource(vsshader, vertexString)
+      webgl.shaderSource(fsshader, fragmentString)
+
+      webgl.compileShader(vsshader)
+      webgl.compileShader(fsshader)
+      if (!webgl.getShaderParameter(vsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(vsshader)
+        alert(err)
+      }
+      if (!webgl.getShaderParameter(fsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(fsshader)
+        alert(err)
+      }
+
+      let program = webgl.createProgram()
+
+      webgl.attachShader(program, vsshader)
+      webgl.attachShader(program, fsshader)
+
+      webgl.linkProgram(program)
+      if (!webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
+        const err = webgl.getProgramInfoLog(program)
+        alert(err)
+      }
+
+      webgl.useProgram(program)
+
+      webgl.program = program
+    }
+
+    const points = []
+    const colors = []
+    function iniBuffer (event) {
+      const aColor = webgl.getAttribLocation(webgl.program, 'a_color');
+      const aPosition = webgl.getAttribLocation(webgl.program, "a_position")
+      document.onclick = event => {
+        const x = event.clientX
+        const y = event.clientY
+
+        const rect = event.target.getBoundingClientRect()
+        const top = rect.top
+        const left = rect.left
+
+        const halfCanvasWidth = CANVASWIDTH / 2
+        const halfCanvasHeight = CANVASHEIGHT / 2
+        const x_ = x - left - halfCanvasWidth
+        const y_ = -(y - top - halfCanvasHeight)
+        let color
+        if (x_ > 0) {
+          color = y_ > 0 ? [1.0, 1.0, 1.0] : [1.0, 1.0, 0.0] // y < 0 ? 第一象限 : 第四象限
+        } else {
+          color = y_ > 0 ? [1.0, 0.0, 1.0] : [0.0, 1.0, 1.0] // y < 0 ? 第二象限 : 第三象限
+        }
+        colors.push(...color)
+        points.push(
+          x_ / halfCanvasWidth,
+          y_ / halfCanvasHeight,
+          0,
+        )
+        let pointPosition = new Float32Array(points)
+        // 创建顶点缓冲区
+        const pointBuffer = webgl.createBuffer()
+        webgl.bindBuffer(webgl.ARRAY_BUFFER, pointBuffer)
+        webgl.bufferData(webgl.ARRAY_BUFFER, pointPosition, webgl.STATIC_DRAW)
+
+        webgl.vertexAttribPointer(aPosition, 3, webgl.FLOAT, false, 0, 0)
+        webgl.enableVertexAttribArray(aPosition)
+
+        let pointColor = new Float32Array(colors)
+        // 颜色缓冲区
+        const colorBuffer = webgl.createBuffer()
+        webgl.bindBuffer(webgl.ARRAY_BUFFER, colorBuffer)
+        webgl.bufferData(webgl.ARRAY_BUFFER, pointColor, webgl.STATIC_DRAW)
+
+        webgl.vertexAttribPointer(aColor, 3, webgl.FLOAT, false, 0, 0)
+        webgl.enableVertexAttribArray(aColor)
+
+        draw()
+      }
+    }
+
+    // 绘制
+    function draw() {
+      webgl.clearColor(0.0, 0.0, 0.0, 1.0)
+      webgl.clear(webgl.COLOR_BUFFER_BIT)
+      webgl.drawArrays(webgl.POINTS, 0, points.length / 3)
+    }
+  </script>
+</head>
+<body onload="init()">
+  <canvas id="webglCanvas" width="500" height="500"></canvas>
+</body>
+</html>

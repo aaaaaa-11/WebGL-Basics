@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>纹理绘制-点精灵</title>
+  <script src="./glMatrix-0.9.6.min.js"></script>
+  <script>
+    let webgl
+    const projMat4 = mat4.create()
+    let uniformTexture = 0
+    let textureHandler
+    const vertexString = `
+    attribute vec4 a_position;
+    uniform mat4 proj;
+    void main() {
+      gl_Position = proj * a_position;
+      gl_PointSize = 16.0;
+    }
+    `
+    const fragmentString = `
+    precision mediump float;
+    uniform sampler2D texture;
+    void main() {
+      vec4 color = texture2D(texture, gl_PointCoord);
+      if (color.a < 0.1)
+        discard;
+      gl_FragColor = color;
+    }
+    ` // 根据纹理像素，获取颜色，赋值给图形颜色
+    /*
+    // color.a 透明度
+    if (color.a < 0.1) // 透明度 < 0.1
+        discard; // 丢弃
+     */
+
+    function init() {
+      initWebgl()
+      initShader()
+      initBuffer()
+      draw()
+    }
+
+    function initWebgl () {
+      const canvas = document.getElementById('myCanvas')
+      webgl = canvas.getContext('webgl')
+      webgl.viewport(0, 0, canvas.clientWidth, canvas.clientHeight)
+      mat4.ortho(0, canvas.clientWidth, canvas.clientHeight, 0, -1, 1, projMat4)
+    }
+    function initShader () {
+      const vsshader = webgl.createShader(webgl.VERTEX_SHADER)
+      const fsshader = webgl.createShader(webgl.FRAGMENT_SHADER)
+
+      webgl.shaderSource(vsshader, vertexString)
+      webgl.shaderSource(fsshader, fragmentString)
+
+      webgl.compileShader(vsshader)
+      webgl.compileShader(fsshader)
+
+      if (!webgl.getShaderParameter(vsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(vsshader)
+        console.log('vserr');
+        alert(err)
+        return
+      }
+      if (!webgl.getShaderParameter(fsshader, webgl.COMPILE_STATUS)) {
+        const err = webgl.getShaderInfoLog(fsshader)
+        console.log('fserr');
+        alert(err)
+        return
+      }
+
+      const program = webgl.createProgram()
+
+      webgl.attachShader(program, vsshader)
+      webgl.attachShader(program, fsshader)
+
+      webgl.linkProgram(program)
+
+      if (!webgl.getProgramParameter(program, webgl.LINK_STATUS)) {
+        const err = webgl.getProgramInfoLog(program)
+        console.log('projerr');
+        alert(err)
+        return
+      }
+
+      webgl.useProgram(program)
+
+      webgl.program = program
+    }
+
+    let arr = [
+      100.0, 100.0, 0.0, 1.0,
+      100.0, 104.0, 0.0, 1.0,
+      100.0, 200.0, 0.0, 1.0,
+      200.0, 200.0, 0.0, 1.0
+    ]
+    function initBuffer () {
+      const pointPosition = new Float32Array(arr)
+
+      const triangleBuffer = webgl.createBuffer()
+      webgl.bindBuffer(webgl.ARRAY_BUFFER, triangleBuffer)
+      webgl.bufferData(webgl.ARRAY_BUFFER, pointPosition, webgl.STATIC_DRAW)
+
+
+      const aPosition = webgl.getAttribLocation(webgl.program, 'a_position')
+      webgl.vertexAttribPointer(aPosition, 4, webgl.FLOAT, false, 16, 0)
+      webgl.enableVertexAttribArray(aPosition)
+
+
+      const uniformProj = webgl.getUniformLocation(webgl.program, 'proj')
+      webgl.uniformMatrix4fv(uniformProj, false, projMat4)
+
+      // 获取着色器程序中的纹理变量
+      uniformTexture = webgl.getUniformLocation(webgl.program, 'texture')
+      // 开启混合
+      webgl.enable(webgl.BLEND)
+      // 混合函数：得到两个颜色混合的颜色
+      // blendFunc：https://developer.mozilla.org/zh-CN/docs/Web/API/WebGLRenderingContext/blendFunc
+      webgl.blendFunc(webgl.SRC_ALPHA, webgl.ONE_MINUS_SRC_ALPHA)
+
+      // 加载纹理图片
+      initTexture('./texture.png')
+    }
+
+    // 配置纹理
+    function handleLoadedTexture (texture) {
+      webgl.bindTexture(webgl.TEXTURE_2D, texture)
+      webgl.texImage2D(webgl.TEXTURE_2D, 0, webgl.RGBA, webgl.RGBA, webgl.UNSIGNED_BYTE, texture.image)
+      webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MAG_FILTER, webgl.NEAREST)
+      webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_MIN_FILTER, webgl.NEAREST)
+      webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_S, webgl.REPEAT)
+      webgl.texParameteri(webgl.TEXTURE_2D, webgl.TEXTURE_WRAP_T, webgl.REPEAT)
+      // 赋值给着色器程序中的纹理变量，因为异步原因要加在这里
+      webgl.uniform1i(uniformTexture, 0)
+      draw()
+    }
+
+    // 初始化纹理
+    function initTexture(imageFile) {
+      textureHandler = webgl.createTexture();
+      textureHandler.image = new Image()
+      textureHandler.image.src = imageFile
+      textureHandler.image.onload = function () {
+        handleLoadedTexture(textureHandler)
+      }
+    }
+
+    function draw () {
+      webgl.clearColor(1.0, 0.0, 0.0, 1.0)
+      webgl.clear(webgl.COLOR_BUFFER_BIT)
+      webgl.enable(webgl.DEPTH_TEST)
+      webgl.drawArrays(webgl.POINTS, 0, arr.length / 4)
+    }
+  </script>
+</head>
+<body onload="init()">
+  <canvas id="myCanvas" width="500" height="500"></canvas>
+</body>
+</html>
